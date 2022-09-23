@@ -107,7 +107,7 @@ impl<T: Default> VisibilityCell<T> {
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
-pub struct VisibilityGrid<T: Default> {
+pub struct VisibilityGrid<T: Default = ()> {
     grid: Grid<VisibilityCell<T>>,
     count: u64,
     shadowcast_context: ShadowcastContext<u8>,
