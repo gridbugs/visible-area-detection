@@ -1,0 +1,18 @@
+[package]
+name = "visible_area_detection"
+description = "Slightly opinionated visible area detection for roguelikes"
+version = "0.1.0"
+authors = ["Stephen Sherratt <stephen@sherra.tt>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/gridbugs/visible-area-detection.git"
+repository = "https://github.com/gridbugs/visible-area-detection.git"
+documentation = "https://docs.rs/visible_area_detection"
+edition = "2021"
+
+[dependencies]
+shadowcast = "0.8"
+grid_2d = "0.15"
+rgb_int = "0.1"
+direction = "0.18"
+serde = { version = "1.0", features = ["serde_derive"], optional = true }
