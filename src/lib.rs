@@ -2,15 +2,21 @@ use direction::DirectionBitmap;
 pub use grid_2d::GridEnumerate;
 use grid_2d::{Coord, CoordIter, Grid, Size};
 use rgb_int::Rgb24;
+#[cfg(feature = "serialize")]
+use serde::{Deserialize, Serialize};
 pub use shadowcast::{vision_distance, VisionDistance};
 use shadowcast::{Context as ShadowcastContext, InputGrid};
 use std::marker::PhantomData;
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Rational {
     pub numerator: u32,
     pub denominator: u32,
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Light<V: VisionDistance> {
     pub colour: Rgb24,
     pub vision_distance: V,
@@ -37,6 +43,8 @@ impl<W: World> InputGrid for Visibility<W> {
     }
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum CellVisibility<T> {
     Never,
     Previous(T),
@@ -55,6 +63,8 @@ impl<T> CellVisibility<T> {
     }
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone)]
 struct VisibilityCell<T: Default> {
     last_seen: u64,
     last_lit: u64,
@@ -95,6 +105,8 @@ impl<T: Default> VisibilityCell<T> {
     }
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone)]
 pub struct VisibilityGrid<T: Default> {
     grid: Grid<VisibilityCell<T>>,
     count: u64,

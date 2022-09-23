@@ -1,7 +1,7 @@
 [package]
 name = "visible_area_detection"
 description = "Slightly opinionated visible area detection for roguelikes"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Stephen Sherratt <stephen@sherra.tt>"]
 license = "MIT"
 readme = "README.md"
@@ -9,6 +9,9 @@ homepage = "https://github.com/gridbugs/visible-area-detection.git"
 repository = "https://github.com/gridbugs/visible-area-detection.git"
 documentation = "https://docs.rs/visible_area_detection"
 edition = "2021"
+
+[features]
+serialize = ["serde", "shadowcast/serialize", "grid_2d/serialize", "rgb_int/serialize"]
 
 [dependencies]
 shadowcast = "0.8"
