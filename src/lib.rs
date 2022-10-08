@@ -111,20 +111,14 @@ pub struct VisibilityGrid<T: Default = ()> {
     grid: Grid<VisibilityCell<T>>,
     count: u64,
     shadowcast_context: ShadowcastContext<u8>,
-    pub ambient_light_colour: Rgb24,
 }
 
 impl<T: Default> VisibilityGrid<T> {
     pub fn new(size: Size) -> Self {
-        Self::new_with_ambient_light_colour(size, Rgb24::new_grey(255))
-    }
-
-    pub fn new_with_ambient_light_colour(size: Size, ambient_light_colour: Rgb24) -> Self {
         Self {
             grid: Grid::new_default(size),
             count: 0,
             shadowcast_context: Default::default(),
-            ambient_light_colour,
         }
     }
 
@@ -144,9 +138,10 @@ impl<T: Default> VisibilityGrid<T> {
                     {
                         cell.last_lit = self.count;
                         let distance_squared = (light_coord - cell_coord).magnitude2();
-                        let inverse_light_intensity = (distance_squared * light.diminish.numerator)
-                            / light.diminish.denominator;
-                        let light_colour = light.colour.scalar_div(inverse_light_intensity.max(1));
+                        let light_colour = light.colour.saturating_scalar_mul_div(
+                            light.diminish.denominator,
+                            distance_squared.max(1) * light.diminish.numerator,
+                        );
                         cell.light_colour = cell
                             .light_colour
                             .saturating_add(light_colour.normalised_scalar_mul(visibility));
@@ -158,15 +153,17 @@ impl<T: Default> VisibilityGrid<T> {
 
     pub fn update<W: World, V: VisionDistance>(
         &mut self,
+        ambient_light_colour: Rgb24,
         world: &W,
         vision_distance: V,
         eye: Coord,
     ) {
-        self.update_custom(world, vision_distance, eye, |_, _| {});
+        self.update_custom(ambient_light_colour, world, vision_distance, eye, |_, _| {});
     }
 
     pub fn update_custom<W: World, V: VisionDistance, F: FnMut(&mut T, Coord)>(
         &mut self,
+        ambient_light_colour: Rgb24,
         world: &W,
         vision_distance: V,
         eye: Coord,
@@ -183,7 +180,7 @@ impl<T: Default> VisibilityGrid<T> {
             |coord, visible_directions, _visibility| {
                 let cell = self.grid.get_checked_mut(coord);
                 cell.last_seen = self.count;
-                cell.light_colour = self.ambient_light_colour;
+                cell.light_colour = ambient_light_colour;
                 cell.visible_directions = visible_directions;
                 f(&mut cell.data, coord);
             },
@@ -191,12 +188,13 @@ impl<T: Default> VisibilityGrid<T> {
         self.apply_lights(world);
     }
 
-    pub fn update_omniscient<W: World>(&mut self, world: &W) {
-        self.update_omniscient_custom(world, |_, _| {})
+    pub fn update_omniscient<W: World>(&mut self, ambient_light_colour: Rgb24, world: &W) {
+        self.update_omniscient_custom(ambient_light_colour, world, |_, _| {})
     }
 
     pub fn update_omniscient_custom<W: World, F: FnMut(&mut T, Coord)>(
         &mut self,
+        ambient_light_colour: Rgb24,
         world: &W,
         mut f: F,
     ) {
@@ -206,7 +204,7 @@ impl<T: Default> VisibilityGrid<T> {
             cell.last_seen = self.count;
             cell.last_lit = self.count;
             cell.visible_directions = DirectionBitmap::all();
-            cell.light_colour = self.ambient_light_colour;
+            cell.light_colour = ambient_light_colour;
             f(&mut cell.data, coord);
         }
         self.apply_lights(world);
