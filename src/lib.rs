@@ -140,7 +140,8 @@ impl<T: Default> VisibilityGrid<T> {
                         let distance_squared = (light_coord - cell_coord).magnitude2();
                         let light_colour = light.colour.saturating_scalar_mul_div(
                             light.diminish.denominator,
-                            distance_squared.max(1) * light.diminish.numerator,
+                            light.diminish.denominator
+                                + (distance_squared * light.diminish.numerator),
                         );
                         cell.light_colour = cell
                             .light_colour
