@@ -138,6 +138,13 @@ impl<T: Default> VisibilityGrid<T> {
                     {
                         cell.last_lit = self.count;
                         let distance_squared = (light_coord - cell_coord).magnitude2();
+                        // Multiply the light colour by:
+                        // 1 / (1 + (diminish * distance_squared))
+                        // The "1 +" in the demoninator is so that the hyperbolic function is
+                        // shifted to the left so that the light intensity is 1 when the distance
+                        // is 0. Varying the diminish factor varies the rate at which the light
+                        // diminishes over distance, but the intensity of the light is always 1 at
+                        // a distance of 0.
                         let light_colour = light.colour.saturating_scalar_mul_div(
                             light.diminish.denominator,
                             light.diminish.denominator
