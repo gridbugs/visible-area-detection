@@ -137,19 +137,16 @@ impl<T: Default> VisibilityGrid<T> {
                         && !(visible_directions & cell.visible_directions).is_empty()
                     {
                         cell.last_lit = self.count;
-                        let distance_squared = (light_coord - cell_coord).magnitude2();
-                        // Multiply the light colour by:
-                        // 1 / (1 + (diminish * distance_squared))
-                        // The "1 +" in the demoninator is so that the hyperbolic function is
-                        // shifted to the left so that the light intensity is 1 when the distance
-                        // is 0. Varying the diminish factor varies the rate at which the light
-                        // diminishes over distance, but the intensity of the light is always 1 at
-                        // a distance of 0.
-                        let light_colour = light.colour.saturating_scalar_mul_div(
-                            light.diminish.denominator,
-                            light.diminish.denominator
-                                + (distance_squared * light.diminish.numerator),
-                        );
+                        // If x is the distance from the current point to the light source and the
+                        // diminish factor is expressed as the ratio A/B, then this multiplies the
+                        // light colour by: 1 / (((A/B) * x) + 1)^2
+                        // ...which is rearranged to: B^2 / ((A * x) + B)^2 to gain precision.
+                        let distance = ((light_coord - cell_coord).magnitude2() as f64).sqrt();
+                        let mul_by = light.diminish.denominator * light.diminish.denominator;
+                        let div_by_sqrt = (light.diminish.numerator as f64 * distance)
+                            + light.diminish.denominator as f64;
+                        let div_by = (div_by_sqrt * div_by_sqrt) as u32;
+                        let light_colour = light.colour.saturating_scalar_mul_div(mul_by, div_by);
                         cell.light_colour = cell
                             .light_colour
                             .saturating_add(light_colour.normalised_scalar_mul(visibility));
