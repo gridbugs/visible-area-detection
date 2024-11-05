@@ -8,19 +8,81 @@ pub use shadowcast::{vision_distance, VisionDistance};
 use shadowcast::{Context as ShadowcastContext, InputGrid};
 use std::marker::PhantomData;
 
+/// Describes how a light diminishes with distance from the light source
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Rational {
-    pub numerator: u32,
-    pub denominator: u32,
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
+pub struct Diminish {
+    /// The height of the light off the ground. Higher lights will spread out further. The default
+    /// is 1.0.
+    pub height: f64,
+    /// How tightly the pool of light is focused. A value of 0 is completely unfocused, such as a
+    /// light that emits rays evenly in all directions. Higher values produce a more concentrated
+    /// pool of light that spreads out less far. Negative values produce a saturated region at the
+    /// centre of the pool of light, growing with the magnitude of the negative value. The default
+    /// is 0.
+    pub focus: f64,
+    /// The intensity of the light directly under the light source. Note that lighting calculations
+    /// are normalized so that increasing the height doesn't decrease the intensity of the light
+    /// under the light source. The default is 1.0.
+    pub intensity: f64,
+}
+
+impl Default for Diminish {
+    fn default() -> Self {
+        Self {
+            height: 1.0,
+            focus: 0.0,
+            intensity: 1.0,
+        }
+    }
+}
+
+impl Diminish {
+    pub fn with_height(self, height: f64) -> Self {
+        Self { height, ..self }
+    }
+
+    pub fn with_focus(self, focus: f64) -> Self {
+        Self { focus, ..self }
+    }
+
+    pub fn with_intensity(self, intensity: f64) -> Self {
+        Self { intensity, ..self }
+    }
+
+    // `intensity` is just a scaling factor for the result, so it will be ignored in this
+    // explanation. Thus the intensity of the light at a distance of 0 will be 1.
+    //
+    // We'll start by ignoring `focus` for simplicity and add it in later. Start with the formula:
+    // `1 / (d^2 + h^2)` which is the inverse of the square of the 3d distance from the light
+    // source. To normalize it such that the intensity at a distance of 0 is 1, multiply the entire
+    // thing by h^2. On its own this function produces a pool of light which is unfocused. This
+    // function reduces slowly around d=0, then faster, before slowing down as its value approaches
+    // 0.
+    //
+    // To add the focus, first consider `1 / (d + h)^2` (where h is the constant height). Observe
+    // that this is the same shape as `1 / d^2`, but that it's shifted to the left such that it
+    // crosses d=0 at `1 / h^2`. `1 / (d + h)^2` drops quickly from d=0 and slows down as its value
+    // approaches 1, so it's tightly focussed. The goal of the focus parameter is to interpolate
+    // between the unfocused and focused functions. This is simple, because the denominator:
+    // `(d + h)^2 == d^2 + 2dh + h^2`, which is equivalent to the denominator of the unfocused
+    // formula with the addition of 2dh. Thus by introducing a focus parameter `f` we can
+    // interpolate between the two formulae with:
+    // `h^2 / (d^2 + 2dhf + h^2)`.
+    fn intensity_at_distance(&self, distance: f64) -> f64 {
+        (self.intensity * self.height * self.height)
+            / ((distance * distance)
+                + (2.0 * self.focus * self.height * distance)
+                + (self.height * self.height))
+    }
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct Light<V: VisionDistance> {
     pub colour: Rgb24,
     pub vision_distance: V,
-    pub diminish: Rational,
+    pub diminish: Diminish,
 }
 
 pub trait World {
@@ -137,16 +199,10 @@ impl<T: Default> VisibilityGrid<T> {
                         && !(visible_directions & cell.visible_directions).is_empty()
                     {
                         cell.last_lit = self.count;
-                        // If x is the distance from the current point to the light source and the
-                        // diminish factor is expressed as the ratio A/B, then this multiplies the
-                        // light colour by: 1 / (((A/B) * x) + 1)^2
-                        // ...which is rearranged to: B^2 / ((A * x) + B)^2 to gain precision.
                         let distance = ((light_coord - cell_coord).magnitude2() as f64).sqrt();
-                        let mul_by = light.diminish.denominator * light.diminish.denominator;
-                        let div_by_sqrt = (light.diminish.numerator as f64 * distance)
-                            + light.diminish.denominator as f64;
-                        let div_by = (div_by_sqrt * div_by_sqrt) as u32;
-                        let light_colour = light.colour.saturating_scalar_mul_div(mul_by, div_by);
+                        let light_colour = light.colour.saturating_scalar_mul_f64(
+                            light.diminish.intensity_at_distance(distance),
+                        );
                         cell.light_colour = cell
                             .light_colour
                             .saturating_add(light_colour.normalised_scalar_mul(visibility));
